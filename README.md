@@ -16,10 +16,26 @@ Built from two earlier projects:
 [x1-reflection-token](https://github.com/Lokoweb3/x1-reflection-token)'s `lp_locker` (XDEX LP
 vault, fee-growth maths, XDEX `withdraw` CPI) and
 [token-lock-nft-x1](https://github.com/Lokoweb3/token-lock-nft-x1) (Metaplex NFT receipt,
-self-deploy model). NFT art and metadata are pinned to IPFS through Pinata.
+self-deploy model). Each vault key shows a live card drawn from on-chain data; custom art is
+pinned to IPFS through Pinata.
 
-There's a **website** (`web/`) for locking, claiming and unlocking with a browser wallet, and a
-**command line** (`cli/`). Both share the same client code.
+There's a **website** (`web/`, live at https://lp-lock-nft.vercel.app) for locking, claiming and
+withdrawing with a browser wallet, and a **command line** (`cli/`). Both share the same client code.
+
+## Screenshots
+
+![LP Vault home page](docs/screenshots/home.png)
+
+| Open a vault | Your vaults |
+|---|---|
+| ![Opening a vault: LP position, deposit amount with its live value, term, and the live vault key preview](docs/screenshots/open-a-vault.png) | ![A sealed vault: term progress, deposit, current value, fees ready, Claim rewards and Withdraw LP](docs/screenshots/your-vaults.png) |
+
+| Vault key NFT (live card) | One-of-one layout, set by pool | Phone |
+|---|---|---|
+| ![Default 500x500 vault key card](docs/screenshots/vault-key-default.png) | ![TEST mascot vault key card for the USDC.X/Test pool](docs/screenshots/vault-key-one-of-one.png) | ![LP Vault on a phone](docs/screenshots/home-mobile.png) |
+
+The app screenshots use a throwaway test wallet and a demo pool (XNT/DEMO) on a local copy of X1
+mainnet. The home page and the one-of-one card are from the live site.
 
 > **Unaudited.** Read the program (`programs/lp_lock_nft/src/lib.rs`, about 670 lines including tests) before trusting
 > it with real liquidity. Until you make it immutable (see [Deploy](#deploy-to-mainnet)),
