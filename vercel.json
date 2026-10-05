@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "buildCommand": "npm run web:build",
+  "outputDirectory": "web/public",
+  "functions": {
+    "api/pin.ts": {
+      "maxDuration": 60
+    },
+    "api/art/[file].ts": {
+      "maxDuration": 30
+    },
+    "api/key/[file].ts": {
+      "maxDuration": 30
+    }
+  }
+}

@@ -1,0 +1,10 @@
+node_modules/
+# Rust build output (contains absolute local paths); program keypairs live in target/deploy
+target/
+*-keypair.json
+*.keypair.json
+test-ledger/
+test-ledger.log
+web/public/app.js
+.vercel/
+previews/

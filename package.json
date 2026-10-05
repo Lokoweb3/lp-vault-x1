@@ -1,0 +1,35 @@
+{
+  "name": "lp-token-nft-x1",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "Lock XDEX LP tokens for a fixed time in a 1-of-1 NFT on X1; the NFT holder claims the LP's trading fees",
+  "scripts": {
+    "build": "cargo-build-sbf --manifest-path programs/lp_lock_nft/Cargo.toml --sbf-out-dir target/deploy",
+    "build:testnet": "cargo-build-sbf --manifest-path programs/lp_lock_nft/Cargo.toml --features testnet --sbf-out-dir target/deploy-testnet",
+    "test:rust": "cargo test --manifest-path programs/lp_lock_nft/Cargo.toml",
+    "test:e2e": "tsx tests/e2e-local.ts",
+    "typecheck": "tsc --noEmit",
+    "lp-lock": "tsx cli/lp-lock.ts",
+    "web:build": "node web/build.mjs",
+    "web:dev": "node web/build.mjs --dev && tsx web/dev-server.ts"
+  },
+  "dependencies": {
+    "@noble/hashes": "^1.8.0",
+    "@resvg/resvg-js": "^2.6.2",
+    "@solana/spl-token": "^0.4.15",
+    "@solana/web3.js": "^1.99.0",
+    "buffer": "^6.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.28.2",
+    "playwright": "1.63.0",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3"
+  },
+  "overrides": {
+    "rpc-websockets": "9.3.10"
+  }
+}

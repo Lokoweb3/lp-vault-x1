@@ -1,0 +1,14 @@
+# Never upload keys or build output; the site needs only web/, api/, server/, client/ and package files.
+target/
+*-keypair.json
+*.keypair.json
+programs/
+Cargo.toml
+Cargo.lock
+tests/
+cli/
+test-ledger/
+test-ledger.log
+node_modules/
+web/public/app.js
+previews/

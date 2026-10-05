@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LP Vault</title>
+  <meta name="description" content="Lock XDEX liquidity on X1 in a time vault. Your vault key NFT collects the trading fees and withdraws the LP at maturity.">
+  <meta name="theme-color" content="#0b0f14">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='32' r='29' fill='%2312171f' stroke='%23d4a94f' stroke-width='5'/><circle cx='32' cy='32' r='12' fill='none' stroke='%23d4a94f' stroke-width='4'/><path d='M32 8v12M32 44v12M8 32h12M44 32h12' stroke='%23d4a94f' stroke-width='4'/></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./" aria-label="LP Vault home">
+      <svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="28" /><circle cx="32" cy="32" r="11" /><path d="M32 8v13M32 43v13M8 32h13M43 32h13" /></svg>
+      <span>LP <b>Vault</b></span>
+    </a>
+    <div class="top-actions">
+      <select id="network" aria-label="Network">
+        <option value="mainnet">X1 Mainnet</option>
+        <option value="testnet">X1 Testnet</option>
+      </select>
+      <button id="connect" class="btn gold">Connect wallet</button>
+    </div>
+  </header>
+  <div id="walletMenu" class="menu" hidden></div>
+
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Time-locked liquidity · X1</p>
+        <h1>Your LP, sealed in a vault.<br><span>Your fees, on tap.</span></h1>
+        <p class="lede">Deposit XDEX liquidity for a fixed term. Nobody can withdraw it before maturity, not even you.
+          You get a vault key NFT: whoever holds it collects the trading fees any time, and withdraws the LP when the term ends.</p>
+        <div class="stats" id="stats">
+          <div><span class="stat-num" id="statVaults">—</span><span class="stat-label">vaults sealed</span></div>
+          <div><span class="stat-num" id="statPools">—</span><span class="stat-label">pools</span></div>
+          <div><span class="stat-num">10 yr</span><span class="stat-label">longest term</span></div>
+        </div>
+      </div>
+      <div class="vault-door" aria-hidden="true">
+        <svg viewBox="0 0 240 240">
+          <defs>
+            <radialGradient id="steel" cx="40%" cy="35%" r="75%"><stop offset="0" stop-color="#3a4554"/><stop offset=".6" stop-color="#1c232d"/><stop offset="1" stop-color="#0f141a"/></radialGradient>
+            <linearGradient id="brass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f3d28a"/><stop offset=".5" stop-color="#c9973d"/><stop offset="1" stop-color="#8a6420"/></linearGradient>
+          </defs>
+          <circle cx="120" cy="120" r="114" fill="url(#steel)" stroke="url(#brass)" stroke-width="6"/>
+          <g fill="url(#brass)">
+            <circle cx="120" cy="20" r="6"/><circle cx="120" cy="220" r="6"/><circle cx="20" cy="120" r="6"/><circle cx="220" cy="120" r="6"/>
+            <circle cx="49" cy="49" r="6"/><circle cx="191" cy="49" r="6"/><circle cx="49" cy="191" r="6"/><circle cx="191" cy="191" r="6"/>
+          </g>
+          <circle cx="120" cy="120" r="78" fill="none" stroke="#2b3441" stroke-width="10"/>
+          <g class="dial">
+            <circle cx="120" cy="120" r="54" fill="#141a22" stroke="url(#brass)" stroke-width="4"/>
+            <g stroke="url(#brass)" stroke-width="3" stroke-linecap="round">
+              <path d="M120 70v12M120 158v12M70 120h12M158 120h12M85 85l8 8M147 147l8 8M155 85l-8 8M93 147l-8 8"/>
+            </g>
+            <g stroke="url(#brass)" stroke-width="9" stroke-linecap="round"><path d="M120 120V82M120 120l33 19M120 120l-33 19"/></g>
+            <circle cx="120" cy="120" r="14" fill="url(#brass)"/>
+          </g>
+        </svg>
+      </div>
+    </section>
+
+    <p id="notice" class="notice" hidden></p>
+
+    <ol class="steps">
+      <li><b>Deposit</b><span>Choose an LP position, an amount and a term.</span></li>
+      <li><b>Get the key</b><span>A 1-of-1 vault key NFT lands in your wallet.</span></li>
+      <li><b>Collect fees</b><span>Claim the LP's trading fees whenever you like.</span></li>
+      <li><b>Withdraw</b><span>At maturity, the key holder takes the LP back.</span></li>
+    </ol>
+
+    <section id="viewSection" class="panel" hidden>
+      <div class="panel-head"><h2>Vault</h2></div>
+      <div id="viewBody"></div>
+    </section>
+
+    <div class="layout">
+      <section class="panel" id="lockSection">
+        <div class="panel-head"><h2>Open a vault</h2><span class="tag">New deposit</span></div>
+        <div id="lockGate" class="empty">Connect a wallet to see your LP.</div>
+        <form id="lockForm" hidden>
+          <label class="field">Liquidity position
+            <select id="position"></select>
+          </label>
+          <div id="positionInfo" class="hint mono"></div>
+
+          <label class="field">Deposit amount <span class="hint">LP tokens</span>
+            <div class="input-row">
+              <input id="amount" class="mono" inputmode="decimal" autocomplete="off" placeholder="0.0">
+              <div class="chips" id="pctChips">
+                <button type="button" data-pct="25">25%</button><button type="button" data-pct="50">50%</button><button type="button" data-pct="100">Max</button>
+              </div>
+            </div>
+          </label>
+          <div class="value-card" id="amountValue" aria-live="polite" hidden>
+            <div class="value-main"><span class="value-label">Value locked</span><span class="value-total mono" id="valueTotal"></span></div>
+            <div class="value-parts mono" id="valueParts"></div>
+            <div class="value-share" id="valueShare"></div>
+          </div>
+
+          <div class="field">Term
+            <div class="chips term" id="durationChips">
+              <button type="button" data-days="7">7D</button><button type="button" data-days="30">30D</button>
+              <button type="button" data-days="90" class="on">90D</button><button type="button" data-days="180">180D</button>
+              <button type="button" data-days="365">1Y</button>
+            </div>
+            <div class="input-row">
+              <input id="days" class="mono" inputmode="decimal" value="90" aria-label="Term in days">
+              <span class="hint">days · matures <b id="unlockDate"></b></span>
+            </div>
+          </div>
+
+          <div class="grid2">
+            <label class="field">Key name <input id="nftName" maxlength="32"></label>
+            <label class="field">Symbol <input id="nftSymbol" maxlength="10" value="LPLOCK"></label>
+          </div>
+
+          <div class="art">
+            <div class="art-frame">
+              <img id="artPreview" alt="Live vault key preview" width="500" height="500">
+              <img id="artImg" alt="Your vault key image" hidden>
+            </div>
+            <div>
+              <div class="field-label">Vault key artwork</div>
+              <p class="hint" id="artNote">A live card: it always shows this vault's current LP, pool share, token amounts and maturity.</p>
+              <p class="hint">Or upload your own (PNG, JPG, WebP or GIF up to 500 KB), pinned to IPFS and fixed for good.</p>
+              <div class="input-row">
+                <label class="btn ghost" for="artFile">Upload image</label>
+                <input id="artFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+                <button type="button" id="artReset" class="btn ghost" hidden>Use the live card</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="confirm">
+            <label class="check"><input type="checkbox" id="understand"> <span>I understand nobody, including me, can withdraw this LP before
+              maturity. Whoever holds the vault key NFT gets the fees and the LP.</span></label>
+            <button id="lockBtn" class="btn gold big" type="submit" disabled>Seal the vault</button>
+          </div>
+          <div id="lockStatus" class="status" role="status"></div>
+        </form>
+      </section>
+
+      <section class="panel" id="mineSection">
+        <div class="panel-head"><h2>Your vaults</h2><button id="refresh" class="btn ghost small">Refresh</button></div>
+        <div id="mine" class="locks"><p class="empty">Connect a wallet to see the vault keys it holds.</p></div>
+        <form id="lookup" class="lookup">
+          <label class="field-label" for="lookupNft">Look up any vault</label>
+          <div class="input-row"><input id="lookupNft" class="mono" placeholder="Vault key NFT address" autocomplete="off"><button class="btn ghost">View</button></div>
+        </form>
+      </section>
+    </div>
+
+    <footer>
+      <span>Program <a id="programLink" class="mono" target="_blank" rel="noopener"></a></span>
+      <span>Unaudited. Read the code before depositing real liquidity.</span>
+    </footer>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

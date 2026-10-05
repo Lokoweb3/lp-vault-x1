@@ -1,0 +1,30 @@
+[package]
+name = "lp_lock_nft"
+version = "0.1.0"
+description = "Locks XDEX LP tokens for a fixed time behind a 1-of-1 Metaplex NFT whose holder claims the trading fees"
+edition = "2021"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "lp_lock_nft"
+
+[features]
+default = []
+# Build with --features testnet for X1 testnet's XDEX program.
+testnet = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+anchor-debug = []
+custom-heap = []
+custom-panic = []
+
+[dependencies]
+anchor-lang = "0.32.1"
+anchor-spl = { version = "0.32.1", features = ["metadata"] }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }
