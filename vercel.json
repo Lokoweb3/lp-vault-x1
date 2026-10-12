@@ -13,5 +13,15 @@
     "api/key/[file].ts": {
       "maxDuration": 30
     }
-  }
+  },
+  "rewrites": [
+    {
+      "source": "/dex",
+      "destination": "https://lokodex.vercel.app/dex"
+    },
+    {
+      "source": "/dex/:path*",
+      "destination": "https://lokodex.vercel.app/dex/:path*"
+    }
+  ]
 }
