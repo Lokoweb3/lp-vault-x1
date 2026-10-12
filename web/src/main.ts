@@ -128,12 +128,19 @@ function notice(text: string | null) {
 }
 
 // ---------- your LP positions ----------
+/** Set by a ?pool=<XDEX pool address> link; see preselectPool. */
+let wantedPool = params.get("pool");
 interface Position { pool: Pool; reserves: [bigint, bigint]; held: bigint; pair: string; symbols: [string, string] }
 let positions: Position[] = [];
 
 async function loadPositions() {
   const gate = $("lockGate"), form = $<HTMLFormElement>("lockForm");
-  if (!wallet.address) { gate.textContent = "Connect a wallet to see your LP."; gate.hidden = false; form.hidden = true; return; }
+  if (!wallet.address) {
+    gate.textContent = wantedPool ? "Connect a wallet to lock this pool's LP." : "Connect a wallet to see your LP.";
+    gate.hidden = false; form.hidden = true;
+    if (wantedPool) $("lockSection").scrollIntoView({ block: "center" });
+    return;
+  }
   gate.textContent = "Counting the XDEX LP in your wallet…";
   gate.hidden = false;
   form.hidden = true;
@@ -169,10 +176,24 @@ async function loadPositions() {
     sel.replaceChildren(...positions.map((p, i) => el("option", { value: String(i) }, `${p.pair} · ${fmt(p.held, p.pool.lpDecimals)} LP`)));
     gate.hidden = true;
     form.hidden = false;
+    preselectPool(sel);
     onPositionChange();
   } catch (e) {
     gate.textContent = `Couldn't read your LP: ${errorText(e)}`;
   }
+}
+
+/**
+ * A link with ?pool=<XDEX pool address> (the "Lock in vault" buttons on /dex) picks that pool's
+ * LP once the wallet's positions load, and scrolls to the form. Only the first time, so the
+ * viewer's own choice isn't overridden when positions reload.
+ */
+function preselectPool(sel: HTMLSelectElement) {
+  if (!wantedPool) return;
+  const i = positions.findIndex((p) => p.pool.address.toBase58() === wantedPool);
+  wantedPool = null;
+  if (i >= 0) sel.value = String(i);
+  $("lockSection").scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
 const current = () => positions[Number($<HTMLSelectElement>("position").value)] as Position | undefined;
