@@ -12,6 +12,7 @@ import crypto from "node:crypto";
 import { Pinner, pinResponse, pinata } from "../server/pin.js";
 import { artResponse } from "../server/art.js";
 import { keyResponse } from "../server/key-route.js";
+import { vaultArtResponse } from "../server/x1vault.js";
 
 const PORT = Number(process.env.PORT ?? 8820);
 const ROOT = path.resolve("web/public");
@@ -44,6 +45,11 @@ http.createServer(async (req, res) => {
     }
     if (url.pathname.startsWith("/api/key/")) {
       const r = await keyResponse(new Request(url), process.env);
+      res.writeHead(r.status, Object.fromEntries(r.headers)).end(Buffer.from(await r.arrayBuffer()));
+      return;
+    }
+    if (url.pathname.startsWith("/api/x1vault/")) {
+      const r = await vaultArtResponse(new Request(url), process.env);
       res.writeHead(r.status, Object.fromEntries(r.headers)).end(Buffer.from(await r.arrayBuffer()));
       return;
     }
