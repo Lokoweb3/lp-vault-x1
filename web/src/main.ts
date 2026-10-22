@@ -299,6 +299,7 @@ function showCustomArt(src: string, note: string) {
   $("artPreview").hidden = true;
   $("artReset").hidden = false;
   $("artNote").textContent = note;
+  syncArtDownload();
 }
 $("vaultArtBtn").onclick = async () => {
   const raw = $<HTMLInputElement>("vaultArt").value.trim();
@@ -332,7 +333,31 @@ $("artReset").onclick = () => {
   $("artReset").hidden = true;
   $("artNote").textContent = LIVE_NOTE;
   $<HTMLInputElement>("artFile").value = "";
+  syncArtDownload();
   refreshPreview();
+};
+
+/** The picture shown in the form (the live card preview, or the chosen custom art), once it has loaded. */
+function shownArt() {
+  const custom = $<HTMLImageElement>("artImg");
+  const img = custom.hidden ? $<HTMLImageElement>("artPreview") : custom;
+  return img.getAttribute("src") && img.complete && img.naturalWidth > 0 ? img : null;
+}
+function syncArtDownload() {
+  const btn = $<HTMLButtonElement>("artDownload");
+  btn.disabled = !shownArt();
+  btn.title = btn.disabled ? "Fill in the amount and term to see the card" : "Save this picture";
+}
+for (const id of ["artPreview", "artImg"]) {
+  $(id).addEventListener("load", syncArtDownload);
+  $(id).addEventListener("error", syncArtDownload);
+}
+$("artDownload").onclick = () => {
+  const img = shownArt();
+  if (!img) return;
+  const p = current();
+  const name = $<HTMLInputElement>("nftName").value.trim() || (p ? `${p.pair} LP Vault` : "LP Vault");
+  void downloadArt(img.src, `${name} preview`, $<HTMLButtonElement>("artDownload"));
 };
 
 const LIVE_NOTE = "A live card: it always shows this vault's current LP, pool share, token amounts and maturity.";
