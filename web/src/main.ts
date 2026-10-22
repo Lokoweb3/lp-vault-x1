@@ -405,14 +405,18 @@ async function lockCard(lock: Lock, viewer: string | null) {
   const isHolder = !!viewer && !!holder && holder.owner.toBase58() === viewer;
 
   const img = el("div", { class: "ph" });
+  const status = el("div", { class: "status" });
+  const actions = el("div", { class: "actions" });
+  const download = el("button", { class: "btn ghost", hidden: "" }, "Download artwork") as HTMLButtonElement;
   const safeUrl = isLocal ? /^https?:\/\// : /^https:\/\//; // plain http only for a local test gateway
   if (md?.uri && safeUrl.test(md.uri)) {
     fetch(md.uri).then((r) => r.json()).then((j) => {
-      if (typeof j?.image === "string" && safeUrl.test(j.image)) img.replaceWith(el("img", { src: j.image, alt: md.name }));
+      if (typeof j?.image !== "string" || !safeUrl.test(j.image)) return;
+      img.replaceWith(el("img", { src: j.image, alt: md.name }));
+      download.hidden = false;
+      download.onclick = () => void downloadArt(j.image, `${md.name || `${pair} LP Vault`} ${lock.nftMint.toBase58().slice(0, 6)}`, download);
     }).catch(() => {});
   }
-  const status = el("div", { class: "status" });
-  const actions = el("div", { class: "actions" });
   const total = Math.max(1, lock.unlockAt - lock.lockedAt);
   const pct = Math.min(100, Math.max(0, ((now - lock.lockedAt) / total) * 100));
   const bar = el("div", { class: "term-bar" }, el("i", { style: `width:${pct.toFixed(1)}%` }));
@@ -454,7 +458,29 @@ async function lockCard(lock: Lock, viewer: string | null) {
     };
     actions.append(claim, withdraw);
   }
+  actions.append(download);
   return card;
+}
+
+/**
+ * Saves a vault key's image under a readable name. The art routes (/api/key, /api/art,
+ * /api/x1vault) allow cross-origin reads; an image from somewhere that doesn't just opens in a tab.
+ */
+async function downloadArt(src: string, name: string, btn: HTMLButtonElement) {
+  btn.disabled = true;
+  try {
+    const r = await fetch(src);
+    if (!r.ok) throw new Error(String(r.status));
+    const blob = await r.blob();
+    const ext = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif", "image/svg+xml": "svg" }[blob.type.split(";")[0]] ?? "png";
+    const a = el("a", { href: URL.createObjectURL(blob), download: `${name.replace(/[^\w .-]+/g, "_").trim()}.${ext}` }) as HTMLAnchorElement;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+  } catch {
+    window.open(src, "_blank", "noopener");
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 async function act(status: HTMLElement, buttons: HTMLButtonElement[], run: (step: (s: string) => void) => Promise<string>, done: string) {
