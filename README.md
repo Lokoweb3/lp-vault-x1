@@ -17,7 +17,7 @@ Built from two earlier projects:
 vault, fee-growth maths, XDEX `withdraw` CPI) and
 [token-lock-nft-x1](https://github.com/Lokoweb3/token-lock-nft-x1) (Metaplex NFT receipt,
 self-deploy model). Each vault key shows a live card drawn from on-chain data; custom art is
-pinned to IPFS through Pinata.
+pinned to IPFS through Pinata, or stored on X1 itself through [X1 VAULT](https://x1vault.com).
 
 There's a **website** (`web/`, live at https://lp-lock-nft.vercel.app) for locking, claiming and
 withdrawing with a browser wallet, and a **command line** (`cli/`). Both share the same client code.
@@ -72,6 +72,7 @@ client/tokens.ts                  token and NFT names (Token-2022 / Metaplex met
 client/tx.ts                      simulate, fit the compute limit, send and confirm
 server/pin.ts                     Pinata pinning of NFT art + metadata (key stays server-side)
 api/pin.ts                        the Vercel function wrapping server/pin.ts
+server/x1vault.ts                 reads vault key art stored on X1 through X1 VAULT (api/x1vault)
 web/src/                          the website (main.ts, wallet.ts, art.ts), bundled by web/build.mjs
 web/public/                       index.html, style.css and the built app.js
 web/dev-server.ts                 local server for the site and /api/pin
@@ -168,6 +169,17 @@ stand-in cut from vault `7Epm…`'s art. The lock form previews the exact card t
 uncached 404. **Keep `/api/key` and `/api/art` online for good:** NFT metadata is immutable, and
 existing NFTs point at them. A custom upload instead pins a fixed image to IPFS (served from `/api/art`).
 
+**Art stored on X1 (X1 VAULT).** The other fixed-art option: upload the image on
+[x1vault.com](https://x1vault.com) (the wallet pays a one-time storage deposit there, about
+0.066 XNT per 9 KB), then paste the file address or link into the lock form. No Pinata involved:
+the NFT points at `/api/key/<nft>.json?art=<file>`, still built live from the chain, with its image
+at `/api/x1vault/<file>.<ext>`. That route reads the file account and its 9 KB pieces from X1 (layout
+from x1vault.com/docs), checks the BLAKE3 hash and serves only sealed, unencrypted PNG, JPEG, WebP
+or GIF files up to 500 KB, cached for a year. The form checks the whole file through
+`/api/x1vault/<file>.json` before locking. If the file ever can't be read, the metadata falls back
+to the live card. Like `/api/key`, keep `/api/x1vault` online: wallets can't read X1 accounts
+themselves, so this route is what turns the on-chain file into an image link.
+
 **The pin service is not an open upload service.** It only pins for a request that names a real
 XDEX pool on the chosen network and a wallet that holds at least the LP being locked. It accepts
 only a PNG, JPEG, WebP or GIF image up to 500 KB, and it builds the metadata JSON itself (pair,
@@ -193,7 +205,8 @@ function. In the Vercel project, set:
 | `PINATA_JWT` | Pinata API key with Files: Write (required for uploads) |
 | `IPFS_GATEWAY` | optional, e.g. your dedicated gateway `https://<name>.mypinata.cloud/ipfs/` (default `gateway.pinata.cloud`) |
 | `LP_LOCK_PROGRAM_ID` | optional, your program id if you redeployed under another one (or `_MAINNET` / `_TESTNET`) |
-| `RPC_MAINNET`, `RPC_TESTNET` | optional, RPC the pin check uses |
+| `RPC_MAINNET`, `RPC_TESTNET` | optional, RPC the pin check, live cards and X1 VAULT art use |
+| `X1VAULT_PROGRAM_ID` | optional, X1 VAULT program (default `34JxpA5LRsuVfvTSDtT1omsuZj6mKmuVKhvd6cQj2VYb`) |
 
 Live at **https://lp-lock-nft.vercel.app** (project `lp-lock-nft`). To redeploy, build locally,
 check the output, then upload only that output:
@@ -220,6 +233,7 @@ npm run lp-lock -- info --nft <mint>
 # Lock all your LP of a pool for 90 days; the art is pinned to IPFS like the website does
 PINATA_JWT=<key> npm run lp-lock -- lock --pool <xdex pool> --amount all --days 90 \
   --name "TOKEN/XNT LP Lock" --symbol LPLOCK --image art.png [--site https://<your site>/] --yes
+#   ...or with an image already stored on X1 through x1vault.com:  --x1vault <file address>
 #   ...or with metadata you already host:  --uri https://<gateway>/ipfs/<cid>
 
 npm run lp-lock -- claim --nft <mint> --yes            # trading fees -> your wallet (XNT unwrapped)

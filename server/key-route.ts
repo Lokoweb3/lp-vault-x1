@@ -7,19 +7,28 @@
  *
  * Add ?network=testnet for testnet. Responses are cached briefly at the edge; a missing
  * vault (not confirmed yet, or withdrawn) is a 404 that is never cached.
+ *
+ * With ?art=<X1 VAULT file> the JSON's image is that file (fixed art stored on X1, served by
+ * server/x1vault.ts) instead of the live card. If the file can't be used, the live card is
+ * shown instead, so the key never goes blank.
  */
 import { Connection, PublicKey } from "@solana/web3.js";
 import { Network, XDEX_PROGRAM } from "../client/xdex.js";
 import { MAX_LOCK_DURATION } from "../client/lp-lock-nft.js";
 import { nftMetadata } from "../client/tokens.js";
 import { cardSvg, previewCardData, renderPng, vaultCardData } from "./key-card.js";
+import { NotVaultArt, readVaultFile, vaultArtUrl, x1vaultConfig } from "./x1vault.js";
 
 const DEFAULT_PROGRAM = "8N4E3ZHBiYRMia8Hs27J6f3b9QM8wiTYcMXukSq96Ejf";
 const RPC: Record<Network, string> = { mainnet: "https://rpc.mainnet.x1.xyz", testnet: "https://rpc.testnet.x1.xyz" };
 
 /** The metadata URI a new vault's NFT gets (stored on chain, so it must stay stable). */
-export const liveKeyUri = (base: string, nftMint: string, network: Network) =>
-  `${base.replace(/\/$/, "")}/api/key/${nftMint}.json${network === "testnet" ? "?network=testnet" : ""}`;
+export const liveKeyUri = (base: string, nftMint: string, network: Network, art?: string) => {
+  const q = new URLSearchParams();
+  if (art) q.set("art", art);
+  if (network === "testnet") q.set("network", "testnet");
+  return `${base.replace(/\/$/, "")}/api/key/${nftMint}.json${q.size ? `?${q}` : ""}`;
+};
 
 const text = (status: number, body: string) => new Response(body, { status, headers: { "content-type": "text/plain", "cache-control": "no-store" } });
 const cached = (seconds: number) => `public, max-age=${seconds}, s-maxage=${seconds}, stale-while-revalidate=86400`;
@@ -60,13 +69,22 @@ export async function keyResponse(req: Request, env: Record<string, string | und
     const base = (env.PUBLIC_URL || url.origin).replace(/\/$/, "");
     const net = network === "testnet" ? "&network=testnet" : "";
     // The image link changes hourly so wallets that cache by URL pick up the new numbers.
-    const image = `${base}/api/key/${id}.png?v=${Math.floor(Date.now() / 3_600_000)}${net}`;
+    let image = `${base}/api/key/${id}.png?v=${Math.floor(Date.now() / 3_600_000)}${net}`, imageType = "image/png", live = true;
+    const art = url.searchParams.get("art");
+    if (art && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(art)) {
+      const vault = x1vaultConfig(network, env);
+      const f = await readVaultFile(vault.conn, vault.programId, new PublicKey(art)).catch((e) => {
+        if (e instanceof NotVaultArt) return null;
+        throw e;
+      });
+      if (f) { image = vaultArtUrl(base, art, f.ext, network); imageType = f.mime; live = false; }
+    }
     const page = `${base}/?network=${network}&nft=${id}`;
     const matures = new Date(c.unlockAt * 1000).toISOString().slice(0, 16).replace("T", " ") + " UTC";
     const json = {
       name: md?.name || `${c.pair} LP Vault`, symbol: md?.symbol || "LPLOCK",
       description: `${c.lpAmount} ${c.pair} XDEX LP (${c.sharePct} of the pool, ${c.amounts} now), locked until ${matures} on X1 ${network}. `
-        + `The holder of this NFT claims the LP's trading fees, and the LP itself once the lock ends. The picture updates with the pool. Live details: ${page}`,
+        + `The holder of this NFT claims the LP's trading fees, and the LP itself once the lock ends.${live ? " The picture updates with the pool." : ""} Live details: ${page}`,
       image, external_url: page,
       attributes: [
         { trait_type: "Pair", value: c.pair },
@@ -76,7 +94,7 @@ export async function keyResponse(req: Request, env: Record<string, string | und
         { trait_type: "Matures", value: matures },
         { trait_type: "Network", value: `X1 ${network}` },
       ],
-      properties: { category: "image", files: [{ uri: image, type: "image/png" }] },
+      properties: { category: "image", files: [{ uri: image, type: imageType }] },
     };
     return new Response(JSON.stringify(json), { headers: { "content-type": "application/json", "cache-control": cached(300), "access-control-allow-origin": "*" } });
   } catch (e) {

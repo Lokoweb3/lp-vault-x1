@@ -5,9 +5,10 @@
  *   npm run lp-lock -- status [--wallet <address>]
  *   npm run lp-lock -- info --nft <mint>
  *   npm run lp-lock -- lock --pool <pool> --amount <LP base units|all> --days <n> \
- *       --name "TOKEN/XNT LP Lock" --symbol LPLOCK (--uri <metadata uri> | --image art.png) [--yes]
- *       (--image pins to IPFS through Pinata: set PINATA_JWT; --site <url> is the site that serves the art
- *       links and the lock page, default https://lp-lock-nft.vercel.app)
+ *       --name "TOKEN/XNT LP Lock" --symbol LPLOCK (--uri <metadata uri> | --image art.png | --x1vault <file>) [--yes]
+ *       (--image pins to IPFS through Pinata: set PINATA_JWT; --x1vault uses an image already stored on
+ *       X1 through x1vault.com; --site <url> is the site that serves the art links and the lock page,
+ *       default https://lp-lock-nft.vercel.app)
  *   npm run lp-lock -- claim --nft <mint> [--slippage-bps 100] [--yes]
  *   npm run lp-lock -- unlock --nft <mint> [--yes]
  *
@@ -22,6 +23,8 @@ import { Connection, Keypair, PublicKey, TransactionInstruction } from "@solana/
 import { prepareTx, sendAndConfirmRaw } from "../client/tx.js";
 import { NATIVE_MINT, TOKEN_PROGRAM_ID, getAccount, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { handlePin, pinata } from "../server/pin.js";
+import { liveKeyUri } from "../server/key-route.js";
+import { readVaultImage, x1vaultConfig } from "../server/x1vault.js";
 import { Network, XDEX_PROGRAM, readPool } from "../client/xdex.js";
 import {
   buildClaimRewards, buildLockLp, buildUnlock, getLock, locksHeldBy, nftHolder, quoteRewards, type Lock,
@@ -37,7 +40,7 @@ const { values: o, positionals } = parseArgs({
     program: { type: "string", default: DEFAULT_PROGRAM }, yes: { type: "boolean", default: false },
     wallet: { type: "string" }, nft: { type: "string" }, pool: { type: "string" }, amount: { type: "string" },
     days: { type: "string" }, seconds: { type: "string" }, name: { type: "string" }, symbol: { type: "string", default: "LPLOCK" },
-    uri: { type: "string" }, image: { type: "string" }, site: { type: "string" },
+    uri: { type: "string" }, image: { type: "string" }, x1vault: { type: "string" }, site: { type: "string" },
     "slippage-bps": { type: "string", default: "100" },
   },
 });
@@ -119,7 +122,15 @@ if (cmd === "status") {
     console.log(`Art pinned: ${pinned.image}\nMetadata:   ${pinned.uri}`);
     uri = pinned.uri;
   }
-  if (!uri) throw new Error("--uri <metadata json> or --image <file> is required (the NFT's art).");
+  if (!uri && o.x1vault) {
+    // Same as the web app: the live metadata link with ?art=, after checking the whole file reads back.
+    const file = new PublicKey(o.x1vault);
+    const vault = x1vaultConfig(network, { ...process.env, [`RPC_${network.toUpperCase()}`]: o.rpc ?? RPC[network] });
+    const art = await readVaultImage(vault.conn, vault.programId, file);
+    uri = liveKeyUri(o.site ?? process.env.PUBLIC_URL ?? "https://lp-lock-nft.vercel.app", nft.publicKey.toBase58(), network, file.toBase58());
+    console.log(`X1 VAULT art: ${art.mime}, ${art.size} bytes\nMetadata:     ${uri}`);
+  }
+  if (!uri) throw new Error("--uri <metadata json>, --image <file> or --x1vault <file> is required (the NFT's art).");
   const b = await buildLockLp(conn, programId, xdex, owner.publicKey, { pool, amount, durationSeconds: seconds, name, symbol: o.symbol!, uri, nftMint: nft });
   console.log(`Locking ${units(b.summary.lp, b.summary.lpDecimals)} of ${units(b.summary.held, b.summary.lpDecimals)} LP until ${when(Math.floor(Date.now() / 1000) + seconds)}.`);
   console.log("The LP cannot be withdrawn by anyone before then. Rewards (trading fees) stay claimable by the NFT holder.");

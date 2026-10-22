@@ -12,6 +12,9 @@
     },
     "api/key/[file].ts": {
       "maxDuration": 30
+    },
+    "api/x1vault/[file].ts": {
+      "maxDuration": 30
     }
   },
   "rewrites": [

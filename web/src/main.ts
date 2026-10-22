@@ -1,7 +1,8 @@
 /**
  * LP Lock NFT web app. Everything runs in the browser against the X1 RPC; the wallet signs.
- * Server calls: /api/key (the live vault key image, also the preview here) and, only for a
- * custom uploaded image, /api/pin (Pinata key stays server-side).
+ * Server calls: /api/key (the live vault key image, also the preview here) and, only for
+ * custom art, /api/pin (an uploaded image; the Pinata key stays server-side) or /api/x1vault
+ * (an image already stored on X1 through X1 VAULT).
  */
 import { Connection, Keypair, PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { NATIVE_MINT, TOKEN_PROGRAM_ID, unpackAccount, unpackMint } from "@solana/spl-token";
@@ -226,6 +227,8 @@ for (const id of ["amount", "days", "nftName", "nftSymbol"]) $(id).addEventListe
 $("understand").addEventListener("change", refreshPreview);
 
 let customImage: Uint8Array | null = null;
+/** An X1 VAULT file address to use as fixed art (checked by /api/x1vault/<addr>.json). */
+let vaultArt: string | null = null;
 let validationShown = false;
 function refreshPreview() {
   const p = current();
@@ -237,7 +240,7 @@ function refreshPreview() {
   const amt = lpAmount();
   const okAmount = !!p && amt !== null && amt > 0n && amt <= p.held;
   showValue(p, okAmount ? amt! : null);
-  if (p && okAmount && validDays && !customImage) schedulePreview(p.pool.address.toBase58(), amt!, unlockAt);
+  if (p && okAmount && validDays && !customImage && !vaultArt) schedulePreview(p.pool.address.toBase58(), amt!, unlockAt);
   const name = $<HTMLInputElement>("nftName").value.trim(), symbol = $<HTMLInputElement>("nftSymbol").value.trim();
   const problem = !p ? "" : !okAmount ? "Enter an amount up to what you hold." : !validDays ? "Pick a term up to 10 years." :
     !name || new TextEncoder().encode(name).length > 32 ? "The key name must be 1-32 characters." :
@@ -286,15 +289,44 @@ $<HTMLInputElement>("artFile").onchange = async () => {
   if (!f) return;
   if (f.size > MAX_IMAGE_BYTES) { setStatus("lockStatus", "That image is over 500 KB.", "err"); return; }
   customImage = new Uint8Array(await f.arrayBuffer());
+  vaultArt = null;
+  showCustomArt(URL.createObjectURL(f), "Your image, pinned to IPFS and fixed for good (it won't show live numbers).");
+};
+function showCustomArt(src: string, note: string) {
   const img = $<HTMLImageElement>("artImg");
-  img.src = URL.createObjectURL(f);
+  img.src = src;
   img.hidden = false;
   $("artPreview").hidden = true;
   $("artReset").hidden = false;
-  $("artNote").textContent = "Your image, pinned to IPFS and fixed for good (it won't show live numbers).";
+  $("artNote").textContent = note;
+}
+$("vaultArtBtn").onclick = async () => {
+  const raw = $<HTMLInputElement>("vaultArt").value.trim();
+  // A bare address, or any link with one in it (x1vault.com/view/<address>).
+  const addr = raw.match(/[1-9A-HJ-NP-Za-km-z]{32,44}/g)?.pop();
+  if (!addr) { setStatus("lockStatus", "Paste an X1 VAULT file address or link.", "err"); return; }
+  const btn = $<HTMLButtonElement>("vaultArtBtn");
+  btn.disabled = true;
+  setStatus("lockStatus", "Reading the file from X1…");
+  try {
+    const r = await fetch(`api/x1vault/${addr}.json${network === "testnet" ? "?network=testnet" : ""}`);
+    if (!r.ok) throw new Error(r.status === 404 ? (await r.text()) || "Not an X1 VAULT file" : `Couldn't read X1 right now (${r.status})`);
+    const f = await r.json() as { image: string; size: number };
+    vaultArt = addr;
+    customImage = null;
+    $<HTMLInputElement>("artFile").value = "";
+    showCustomArt(f.image, `Your X1 VAULT image (${Math.ceil(f.size / 1000)} KB), stored on X1 for good (it won't show live numbers).`);
+    setStatus("lockStatus", "");
+  } catch (err) {
+    setStatus("lockStatus", errorText(err), "err");
+  } finally {
+    btn.disabled = false;
+  }
 };
 $("artReset").onclick = () => {
   customImage = null;
+  vaultArt = null;
+  $<HTMLInputElement>("vaultArt").value = "";
   $("artImg").hidden = true;
   $("artPreview").hidden = false;
   $("artReset").hidden = true;
@@ -316,9 +348,12 @@ $<HTMLFormElement>("lockForm").onsubmit = async (e) => {
   try {
     const nft = Keypair.generate();
     const name = $<HTMLInputElement>("nftName").value.trim(), symbol = $<HTMLInputElement>("nftSymbol").value.trim();
-    // The live card by default: the NFT points at this site's /api/key/<nft>.json. A custom
-    // image is pinned to IPFS instead and stays fixed.
-    let uri = `${location.origin}/api/key/${nft.publicKey.toBase58()}.json${network === "testnet" ? "?network=testnet" : ""}`;
+    // The live card by default: the NFT points at this site's /api/key/<nft>.json. X1 VAULT
+    // art keeps that link with ?art=<file>; an uploaded image is pinned to IPFS instead. Both stay fixed.
+    const q = new URLSearchParams();
+    if (vaultArt) q.set("art", vaultArt);
+    if (network === "testnet") q.set("network", "testnet");
+    let uri = `${location.origin}/api/key/${nft.publicKey.toBase58()}.json${q.toString() ? `?${q}` : ""}`;
     if (customImage) {
       step("Pinning your vault key image to IPFS…");
       const image = customImage;
@@ -477,6 +512,7 @@ $<HTMLFormElement>("lookup").onsubmit = (e) => {
 $("refresh").onclick = () => void loadMine();
 $<HTMLSelectElement>("network").onchange = () => {
   setNetwork($<HTMLSelectElement>("network").value as Network);
+  if (vaultArt) $("artReset").click(); // an X1 VAULT file lives on one network
   params.set("network", network);
   history.replaceState(null, "", `?${params}`);
   void refreshAll();
